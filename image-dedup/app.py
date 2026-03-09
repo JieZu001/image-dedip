@@ -4,12 +4,40 @@ import requests
 from PIL import Image
 import imagehash
 from io import BytesIO
+import json
 
 app = Flask(__name__)
 
 # 图片存储目录
 WORKING_DIR = os.path.join(os.path.dirname(__file__), 'working')
 os.makedirs(WORKING_DIR, exist_ok=True)
+
+# 加载 SKU 数据库
+DB_INDEX_PATH = '/home/ken/working/图片查重/db_index.json'
+sku_database = {}
+
+def load_sku_database():
+    """加载 SKU 数据库，建立 phash → SKU 的映射"""
+    global sku_database
+    try:
+        with open(DB_INDEX_PATH, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        for item in data:
+            filename = item.get('filename', '')
+            sku = item.get('sku', '')
+            phash = item.get('phash', '')
+            if phash and sku:
+                sku_database[phash] = {
+                    'sku': sku,
+                    'filename': filename
+                }
+        print(f"✅ SKU 数据库加载完成，共 {len(sku_database)} 条记录")
+    except Exception as e:
+        print(f"⚠️ 加载 SKU 数据库失败: {e}")
+
+# 启动时加载数据库
+load_sku_database()
 
 @app.route('/')
 def index():
@@ -42,6 +70,7 @@ def check_image():
         
         # 计算感知哈希
         target_hash = imagehash.phash(img)
+        target_hash_str = str(target_hash)
         
         # 扫描 working 目录
         matches = []
@@ -68,7 +97,8 @@ def check_image():
                         matches.append({
                             'filename': fname,
                             'similarity': max(0, 100 - diff * 12.5),  # 转换为百分比
-                            'hash_diff': diff
+                            'hash_diff': diff,
+                            'hash': str(existing_hash)
                         })
                 except Exception as e:
                     continue
@@ -76,14 +106,34 @@ def check_image():
         # 按相似度排序
         matches.sort(key=lambda x: x['similarity'], reverse=True)
         
-        return jsonify({
+        # 为每个匹配查找 SKU
+        for match in matches:
+            match_hash = match['hash']
+            # 精确匹配
+            if match_hash in sku_database:
+                match['sku'] = sku_database[match_hash]['sku']
+                match['db_filename'] = sku_database[match_hash]['filename']
+            else:
+                match['sku'] = 'UNKNOWN'
+                match['db_filename'] = None
+        
+        # 构建输出结果
+        result = {
             'success': True,
             'is_duplicate': len(matches) > 0,
-            'target_hash': str(target_hash),
+            'target_hash': target_hash_str,
             'matches': matches,
             'total_images': len(working_files),
             'message': f'发现 {len(matches)} 个相似图片' if matches else '未找到重复图片'
-        })
+        }
+        
+        # 如果找到重复，输出具体的 SKU 列表
+        if matches:
+            sku_list = [m['sku'] for m in matches if m.get('sku') and m['sku'] != 'UNKNOWN']
+            result['duplicate_skus'] = sku_list
+            result['duplicate_count'] = len(sku_list)
+        
+        return jsonify(result)
         
     except requests.exceptions.RequestException as e:
         return jsonify({'error': f'下载图片失败: {str(e)}'}), 400
@@ -128,18 +178,25 @@ def list_images():
             try:
                 img = Image.open(fpath)
                 img_hash = imagehash.phash(img)
+                hash_str = str(img_hash)
+                
+                # 查找 SKU
+                sku_info = sku_database.get(hash_str, {})
+                
                 images.append({
                     'filename': fname,
-                    'hash': str(img_hash),
+                    'hash': hash_str,
                     'size': os.path.getsize(fpath),
                     'width': img.width,
-                    'height': img.height
+                    'height': img.height,
+                    'sku': sku_info.get('sku', 'UNKNOWN')
                 })
             except:
                 images.append({
                     'filename': fname,
                     'hash': None,
-                    'size': os.path.getsize(fpath)
+                    'size': os.path.getsize(fpath),
+                    'sku': 'UNKNOWN'
                 })
     
     return jsonify({
