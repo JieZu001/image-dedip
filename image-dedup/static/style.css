@@ -242,5 +242,77 @@ button:hover {
     
     main {
         padding: 20px;
+        /* SKU 标签样式 */
+.sku-tag {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    margin-top: 5px;
+    font-weight: bold;
+}
+
+.sku-tag.unknown {
+    background: #ccc;
+}
+
+/* SKU 重复提示框 */
+.sku-box {
+    background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+    border: 2px solid #e53935;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.sku-box h3 {
+    color: #c62828;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+}
+
+.sku-box ul {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+}
+
+.sku-item {
+    background: white;
+    color: #c62828;
+    padding: 8px 15px;
+    border-radius: 6px;
+    font-size: 1.1em;
+    border: 2px solid #e53935;
+    box-shadow: 0 2px 5px rgba(229, 57, 53, 0.2);
+    list-style: none;
+}
+
+/* 匹配结果中的 SKU 标签 */
+.sku-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    margin-left: 10px;
+    font-weight: bold;
+}
+
+.sku-badge.unknown {
+    background: #ccc;
+}
+
+.match-hash {
+    margin-top: 8px;
+    color: #666;
+    font-size: 0.85em;
+}
     }
 }
