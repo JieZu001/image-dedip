@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>图片查重工具</title>
+    <title>图片查重工具 - SKU版</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
         <header>
             <h1>🔍 图片查重工具</h1>
-            <p>输入图片链接，检查是否与库中图片重复</p>
+            <p>输入图片链接，检查是否与库中图片重复，输出重复 SKU</p>
         </header>
 
         <main>
             <!-- URL 查重 -->
             <section class="check-section">
-                <h2>链接查重</h2>
+                <h2>🔗 链接查重</h2>
                 <div class="input-group">
                     <input type="url" id="imageUrl" placeholder="https://example.com/image.jpg" />
                     <button onclick="checkImage()">开始查重</button>
@@ -72,22 +72,43 @@
                 }
 
                 let html = '';
+                
                 if (data.is_duplicate) {
                     html += `<div class="alert alert-warning">
                         ⚠️ ${data.message}
                         <br><small>目标图片哈希: ${data.target_hash}</small>
                     </div>`;
                     
-                    html += '<div class="matches">';
+                    // 显示重复的 SKU 列表
+                    if (data.duplicate_skus && data.duplicate_skus.length > 0) {
+                        html += `<div class="sku-box"><h3>🎯 重复的 SKU (${data.duplicate_count}个)</h3><ul>`;
+                        data.duplicate_skus.forEach(sku => {
+                            html += `<li class="sku-item"><strong>${sku}</strong></li>`;
+                        });
+                        html += '</ul></div>';
+                    }
+                    
+                    // 显示详细匹配信息
+                    html += '<div class="matches"><h3>📋 详细匹配结果</h3>';
                     data.matches.forEach(match => {
+                        const skuBadge = match.sku !== 'UNKNOWN' 
+                            ? `<span class="sku-badge">SKU: ${match.sku}</span>` 
+                            : '<span class="sku-badge unknown">SKU: 未知</span>';
+                        
                         html += `
                             <div class="match-item">
                                 <div class="match-info">
-                                    <strong>${match.filename}</strong>
-                                    <span class="similarity">相似度: ${match.similarity.toFixed(1)}%</span>
+                                    <div>
+                                        <strong>${match.filename}</strong>
+                                        ${skuBadge}
+                                    </div>
+                                    <span class="similarity">${match.similarity.toFixed(1)}%</span>
                                 </div>
                                 <div class="progress-bar">
                                     <div class="progress-fill" style="width: ${match.similarity}%"></div>
+                                </div>
+                                <div class="match-hash">
+                                    <small>哈希: ${match.hash.substring(0, 16)}... | 差异: ${match.hash_diff}</small>
                                 </div>
                             </div>
                         `;
@@ -108,84 +129,5 @@
         }
 
         async function uploadImage() {
-            const fileInput = document.getElementById('fileInput');
-            const resultDiv = document.getElementById('uploadResult');
-            
-            if (!fileInput.files.length) return;
-
-            const formData = new FormData();
-            formData.append('image', fileInput.files[0]);
-
-            resultDiv.innerHTML = '<div class="loading">正在上传...</div>';
-
-            try {
-                const response = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (data.error) {
-                    resultDiv.innerHTML = `<div class="alert alert-error">${data.error}</div>`;
-                } else {
-                    resultDiv.innerHTML = `
-                        <div class="alert alert-success">
-                            ✅ ${data.message}
-                            <br><small>哈希: ${data.hash}</small>
-                        </div>
-                    `;
-                    // 刷新图片库
-                    loadGallery();
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="alert alert-error">上传失败: ${error.message}</div>`;
-            }
-        }
-
-        async function loadGallery() {
-            try {
-                const response = await fetch('/api/images');
-                const data = await response.json();
-
-                document.getElementById('imageCount').textContent = `(${data.count} 张)`;
-
-                const gallery = document.getElementById('imageGallery');
-                if (data.images.length === 0) {
-                    gallery.innerHTML = '<p class="empty">暂无图片</p>';
-                    return;
-                }
-
-                gallery.innerHTML = data.images.map(img => `
-                    <div class="gallery-item" title="${img.filename}">
-                        <div class="gallery-icon">🖼️</div>
-                        <div class="gallery-name">${img.filename}</div>
-                        <div class="gallery-hash">${img.hash ? img.hash.substring(0, 8) + '...' : 'N/A'}</div>
-                        ${img.width ? `<div class="gallery-size">${img.width}×${img.height}</div>` : ''}
-                    </div>
-                `).join('');
-
-            } catch (error) {
-                document.getElementById('imageGallery').innerHTML = 
-                    `<p class="error">加载失败: ${error.message}</p>`;
-            }
-        }
-
-        // 拖拽上传
-        const uploadArea = document.getElementById('uploadArea');
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            document.getElementById('fileInput').files = e.dataTransfer.files;
-            uploadImage();
-        });
-    </script>
-</body>
-</html>
+            const fileInput = document.getElement
+...(truncated)...
