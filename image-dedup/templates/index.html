@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片查重工具</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 图片查重工具</h1>
+            <p>输入图片链接，检查是否与库中图片重复</p>
+        </header>
+
+        <main>
+            <!-- URL 查重 -->
+            <section class="check-section">
+                <h2>链接查重</h2>
+                <div class="input-group">
+                    <input type="url" id="imageUrl" placeholder="https://example.com/image.jpg" />
+                    <button onclick="checkImage()">开始查重</button>
+                </div>
+                <div id="checkResult"></div>
+            </section>
+
+            <!-- 本地上传 -->
+            <section class="upload-section">
+                <h2>📤 上传新图片</h2>
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="fileInput" accept="image/*" onchange="uploadImage()" />
+                    <p>点击或拖拽图片到这里上传</p>
+                </div>
+                <div id="uploadResult"></div>
+            </section>
+
+            <!-- 图片库 -->
+            <section class="gallery-section">
+                <h2>📁 图片库 <span id="imageCount">(加载中...)</span></h2>
+                <div id="imageGallery" class="gallery"></div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // 页面加载时获取图片列表
+        window.onload = loadGallery;
+
+        async function checkImage() {
+            const url = document.getElementById('imageUrl').value.trim();
+            const resultDiv = document.getElementById('checkResult');
+            
+            if (!url) {
+                resultDiv.innerHTML = '<div class="alert alert-error">请输入图片链接</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="loading">正在分析...</div>';
+
+            try {
+                const response = await fetch('/api/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    resultDiv.innerHTML = `<div class="alert alert-error">${data.error}</div>`;
+                    return;
+                }
+
+                let html = '';
+                if (data.is_duplicate) {
+                    html += `<div class="alert alert-warning">
+                        ⚠️ ${data.message}
+                        <br><small>目标图片哈希: ${data.target_hash}</small>
+                    </div>`;
+                    
+                    html += '<div class="matches">';
+                    data.matches.forEach(match => {
+                        html += `
+                            <div class="match-item">
+                                <div class="match-info">
+                                    <strong>${match.filename}</strong>
+                                    <span class="similarity">相似度: ${match.similarity.toFixed(1)}%</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${match.similarity}%"></div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                } else {
+                    html += `<div class="alert alert-success">
+                        ✅ ${data.message}
+                        <br><small>目标图片哈希: ${data.target_hash}</small>
+                    </div>`;
+                }
+
+                resultDiv.innerHTML = html;
+
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="alert alert-error">请求失败: ${error.message}</div>`;
+            }
+        }
+
+        async function uploadImage() {
+            const fileInput = document.getElementById('fileInput');
+            const resultDiv = document.getElementById('uploadResult');
+            
+            if (!fileInput.files.length) return;
+
+            const formData = new FormData();
+            formData.append('image', fileInput.files[0]);
+
+            resultDiv.innerHTML = '<div class="loading">正在上传...</div>';
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    resultDiv.innerHTML = `<div class="alert alert-error">${data.error}</div>`;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            ✅ ${data.message}
+                            <br><small>哈希: ${data.hash}</small>
+                        </div>
+                    `;
+                    // 刷新图片库
+                    loadGallery();
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="alert alert-error">上传失败: ${error.message}</div>`;
+            }
+        }
+
+        async function loadGallery() {
+            try {
+                const response = await fetch('/api/images');
+                const data = await response.json();
+
+                document.getElementById('imageCount').textContent = `(${data.count} 张)`;
+
+                const gallery = document.getElementById('imageGallery');
+                if (data.images.length === 0) {
+                    gallery.innerHTML = '<p class="empty">暂无图片</p>';
+                    return;
+                }
+
+                gallery.innerHTML = data.images.map(img => `
+                    <div class="gallery-item" title="${img.filename}">
+                        <div class="gallery-icon">🖼️</div>
+                        <div class="gallery-name">${img.filename}</div>
+                        <div class="gallery-hash">${img.hash ? img.hash.substring(0, 8) + '...' : 'N/A'}</div>
+                        ${img.width ? `<div class="gallery-size">${img.width}×${img.height}</div>` : ''}
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                document.getElementById('imageGallery').innerHTML = 
+                    `<p class="error">加载失败: ${error.message}</p>`;
+            }
+        }
+
+        // 拖拽上传
+        const uploadArea = document.getElementById('uploadArea');
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            document.getElementById('fileInput').files = e.dataTransfer.files;
+            uploadImage();
+        });
+    </script>
+</body>
+</html>
